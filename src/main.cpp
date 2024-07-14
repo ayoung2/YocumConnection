@@ -70,18 +70,6 @@ SoftwareSerial ss = SoftwareSerial(SFX_TX, SFX_RX);
 #define LINE_BUFFER_SIZE 80 //!< Size of the line buffer
 char line_buffer[LINE_BUFFER_SIZE];
 
-void flushInput() {
-  // Read all available serial input to flush pending data.
-  uint16_t timeoutloop = 0;
-  while (timeoutloop++ < 40) {
-    while(ss.available()) {
-      ss.read();
-      timeoutloop = 0;  // If char was received reset the timer
-    }
-    delay(1);
-  }
-}
-
 void serialPrintLine(String string)
 {
   if(debugThroughComp)
@@ -90,14 +78,12 @@ void serialPrintLine(String string)
   }
 }
 
-
+#pragma region display
 void display_end_data_transmission()
 {
   digitalWrite(DISPLAY_CS, HIGH);  // CS = 1;
   delay(1);
 }
-
-
 
 void display_data(char i)
 {    
@@ -117,7 +103,6 @@ void display_data(char i)
     }
 }
 
-
 void display_start_data_transmission()
 {  
   digitalWrite(DISPLAY_CS, LOW);   // CS = 0;
@@ -132,8 +117,6 @@ void display_start_data_transmission()
   digitalWrite(DISPLAY_SCL, HIGH); // Clock RW Pin in
   digitalWrite(DISPLAY_SCL, LOW);
 }
-
-
 
 void display_command(char i)
 {  
@@ -163,7 +146,6 @@ void display_command(char i)
     }
   digitalWrite(DISPLAY_CS, HIGH);  // CS = 1;
 }
-
 
 void display_clear_screen(){         // clear display 
  display_command(0x01);
@@ -249,9 +231,6 @@ void testDisplay(String firstLine, String secondLine, int firstLineOffset)
   
 }
 
-
-
-
 void display_init(){
   delay(300);
 
@@ -269,8 +248,9 @@ void display_init(){
   display_command(0x0C);             //Display ON
   delay(2);
 }
+#pragma endregion
 
-
+#pragma region audio
 void playDTMF(char digit) 
 {
   ss.println("q");
@@ -292,6 +272,120 @@ void playDTMF(char digit)
   serialPrintLine(filename);
   ss.println(filename);
 }
+
+int readLine(void) {
+  int x = ss.readBytesUntil('\n', line_buffer, LINE_BUFFER_SIZE);
+  line_buffer[x] = 0;
+
+  if (ss.peek() == '\r')
+    ss.read();
+  // stream->readBytesUntil('\r', line_buffer, LINE_BUFFER_SIZE);
+  return x;
+}
+
+uint8_t volUp() {
+  while (ss.available())
+    ss.read();
+
+  ss.println("+");
+  readLine();
+
+  uint8_t v = atoi(line_buffer);
+  
+  if(debugThroughComp)
+  {
+    Serial.println(v);
+  }
+  return v;
+}
+
+uint8_t volDown() {
+  while (ss.available())
+    ss.read();
+
+  ss.println("-");
+  readLine();
+
+  uint8_t v = atoi(line_buffer);
+  if(debugThroughComp)
+  {
+    Serial.println(v);
+  }
+  return v;
+}
+
+bool setVolume(int vol)
+{
+  int currentVol = volDown()/2;
+  int tryCount = 0;
+  serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
+  while(currentVol > volume && tryCount < 10)
+  {
+    currentVol = volDown()/2;
+    serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
+  }
+  
+  while(currentVol < volume && tryCount < 10)
+  {
+    currentVol = volUp()/2;
+    serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
+    if (currentVol == 0)
+    {
+      tryCount++;
+    }
+    else
+    {
+      tryCount = 0;
+    }
+  }
+
+  return tryCount < 10;
+}
+
+/*!
+ * @brief Do a hard reset by bringing the RST pin low
+ * then read out the output lines
+ * @return Returns the output lines
+ */
+boolean reset(void) {
+  digitalWrite(SFX_RST, LOW);
+  pinMode(SFX_RST, OUTPUT);
+  delay(10);
+  pinMode(SFX_RST, INPUT);
+  delay(1000); // give a bit of time to 'boot up'
+
+  // eat new line
+  readLine();
+  serialPrintLine(line_buffer); // Date and name
+
+  readLine();
+  // "Adafruit FX Sound Board 9/10/14"
+  serialPrintLine(line_buffer); // Date and name
+  if (!strstr(line_buffer, "Adafruit FX Sound Board"))
+    return false;
+
+  delay(250);
+
+  readLine();
+  // Serial.print("3>"); Serial.println(line_buffer);   // FAT type
+  readLine();
+  // Serial.print("4>"); Serial.println(line_buffer);   // # of files
+
+  return true;
+}
+
+void flushInput() {
+  // Read all available serial input to flush pending data.
+  uint16_t timeoutloop = 0;
+  while (timeoutloop++ < 40) {
+    while(ss.available()) {
+      ss.read();
+      timeoutloop = 0;  // If char was received reset the timer
+    }
+    delay(1);
+  }
+}
+#pragma endregion
 
 bool moveSwitch(bool normal)
 {
@@ -365,110 +459,6 @@ void setSignalStatus(int sigStatus, bool moveSwitch)
         //move the switch to normal
         break;
    }
-}
-
-int readLine(void) {
-  int x = ss.readBytesUntil('\n', line_buffer, LINE_BUFFER_SIZE);
-  line_buffer[x] = 0;
-
-  if (ss.peek() == '\r')
-    ss.read();
-  // stream->readBytesUntil('\r', line_buffer, LINE_BUFFER_SIZE);
-  return x;
-}
-
-uint8_t volUp() {
-  while (ss.available())
-    ss.read();
-
-  ss.println("+");
-  readLine();
-
-  uint8_t v = atoi(line_buffer);
-  
-  if(debugThroughComp)
-  {
-    Serial.println(v);
-  }
-  return v;
-}
-
-uint8_t volDown() {
-  while (ss.available())
-    ss.read();
-
-  ss.println("-");
-  readLine();
-
-  uint8_t v = atoi(line_buffer);
-  if(debugThroughComp)
-  {
-    Serial.println(v);
-  }
-  return v;
-}
-
-bool setVolume(int vol)
-{
-  int currentVol = volDown()/2;
-  int tryCount = 0;
-  serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
-  while(currentVol > volume && tryCount < 10)
-  {
-    currentVol = volDown()/2;
-    serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
-  }
-  
-  while(currentVol < volume && tryCount < 10)
-  {
-    currentVol = volUp()/2;
-    serialPrintLine("Current Vol:" + String(currentVol) + ", Board Vol:" + String(volume));
-    if (currentVol == 0)
-    {
-      tryCount++;
-    }
-    else
-    {
-      tryCount = 0;
-    }
-  }
-
-  return tryCount < 10;
-}
-
-
-
-
-/*!
- * @brief Do a hard reset by bringing the RST pin low
- * then read out the output lines
- * @return Returns the output lines
- */
-boolean reset(void) {
-  digitalWrite(SFX_RST, LOW);
-  pinMode(SFX_RST, OUTPUT);
-  delay(10);
-  pinMode(SFX_RST, INPUT);
-  delay(1000); // give a bit of time to 'boot up'
-
-  // eat new line
-  readLine();
-  serialPrintLine(line_buffer); // Date and name
-
-  readLine();
-  // "Adafruit FX Sound Board 9/10/14"
-  serialPrintLine(line_buffer); // Date and name
-  if (!strstr(line_buffer, "Adafruit FX Sound Board"))
-    return false;
-
-  delay(250);
-
-  readLine();
-  // Serial.print("3>"); Serial.println(line_buffer);   // FAT type
-  readLine();
-  // Serial.print("4>"); Serial.println(line_buffer);   // # of files
-
-  return true;
 }
 
 void keypadEvent(KeypadEvent eKey)
@@ -796,6 +786,9 @@ void setup()
   pinMode(DISPLAY_SDI, OUTPUT);
   pinMode(DISPLAY_SCL, OUTPUT);
   display_init();
+
+  pinMode(SWITCH_PIN_OUT, OUTPUT);
+  pinMode(SWITCH_PIN_IN, INPUT);
 
   setDisplay("OBrien Radio", "     Welcome Colin!", 0);
 
