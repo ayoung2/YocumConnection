@@ -69,6 +69,7 @@ SoftwareSerial ss = SoftwareSerial(SFX_TX, SFX_RX);
 
 #define LINE_BUFFER_SIZE 80 //!< Size of the line buffer
 char line_buffer[LINE_BUFFER_SIZE];
+bool ledsOnHigh = true;
 
 void serialPrintLine(String string)
 {
@@ -437,24 +438,54 @@ bool moveSwitch(bool normal)
 
 void setSignalStatus(int sigStatus, bool moveSwitch)
 {
-   digitalWrite(SIGNAL_YLW_PIN, HIGH); 
-   digitalWrite(SIGNAL_RED_PIN, HIGH); 
-   digitalWrite(SIGNAL_GRN_PIN, HIGH);
+   if (ledsOnHigh)
+   {
+    digitalWrite(SIGNAL_YLW_PIN, LOW); 
+    digitalWrite(SIGNAL_RED_PIN, LOW); 
+    digitalWrite(SIGNAL_GRN_PIN, LOW);
+   }
+   else
+   {
+    digitalWrite(SIGNAL_YLW_PIN, HIGH); 
+    digitalWrite(SIGNAL_RED_PIN, HIGH); 
+    digitalWrite(SIGNAL_GRN_PIN, HIGH);
+   }
    
    switch(sigStatus)
    {
      case 0:
-        digitalWrite(SIGNAL_RED_PIN, LOW); 
+        if (ledsOnHigh)
+        {
+          digitalWrite(SIGNAL_RED_PIN, HIGH); 
+        }
+        else
+        {
+          digitalWrite(SIGNAL_RED_PIN, LOW); 
+        }
         serialPrintLine("Signal went Red");
         //do not move switch
         break;
       case 1:
-        digitalWrite(SIGNAL_YLW_PIN, LOW);
+        if (ledsOnHigh)
+        {
+          digitalWrite(SIGNAL_YLW_PIN, HIGH); 
+        }
+        else
+        {
+          digitalWrite(SIGNAL_YLW_PIN, LOW); 
+        }
         serialPrintLine("Signal went Yellow");
         //move the switch to reverse
         break;
       case 2:
-        digitalWrite(SIGNAL_GRN_PIN, LOW);
+        if (ledsOnHigh)
+        {
+          digitalWrite(SIGNAL_GRN_PIN, HIGH); 
+        }
+        else
+        {
+          digitalWrite(SIGNAL_GRN_PIN, LOW); 
+        }
         serialPrintLine("Signal went Green");
         //move the switch to normal
         break;
@@ -778,9 +809,18 @@ void setup()
   pinMode(SIGNAL_GRN_PIN, OUTPUT);
   pinMode(SIGNAL_YLW_PIN, OUTPUT);
   
-  digitalWrite(SIGNAL_RED_PIN, LOW); 
-  digitalWrite(SIGNAL_GRN_PIN, HIGH);
-  digitalWrite(SIGNAL_YLW_PIN, HIGH);
+  if (ledsOnHigh)
+  {
+    digitalWrite(SIGNAL_RED_PIN, HIGH); 
+    digitalWrite(SIGNAL_GRN_PIN, LOW);
+    digitalWrite(SIGNAL_YLW_PIN, LOW);
+  }
+  else
+  {
+    digitalWrite(SIGNAL_RED_PIN, LOW); 
+    digitalWrite(SIGNAL_GRN_PIN, HIGH);
+    digitalWrite(SIGNAL_YLW_PIN, HIGH);
+  }
 
   pinMode(DISPLAY_CS, OUTPUT);
   pinMode(DISPLAY_SDI, OUTPUT);
